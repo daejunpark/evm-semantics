@@ -1927,7 +1927,8 @@ The intrinsic gas calculation mirrors the style of the YellowPaper (appendix H).
 
 ```k
     syntax InternalOp ::= #gasExec ( Schedule , OpCode )
- // ----------------------------------------------------
+                        | #gasExecCall ( Schedule , BExp , Int , Int , Int ) [strict(2)]
+ // ------------------------------------------------------------------------------------
     rule <k> #gasExec(SCHED, SSTORE INDEX NEW) => Csstore(SCHED, NEW, #lookup(STORAGE, INDEX), #lookup(ORIGSTORAGE, INDEX)) ... </k>
          <id> ACCT </id>
          <gas> GAVAIL </gas>
@@ -1956,32 +1957,14 @@ The intrinsic gas calculation mirrors the style of the YellowPaper (appendix H).
 
     rule <k> #gasExec(SCHED, LOG(N) _ WIDTH) => (Glog < SCHED > +Int (Glogdata < SCHED > *Int WIDTH) +Int (N *Int Glogtopic < SCHED >)) ... </k>
 
-    rule <k> #gasExec(SCHED, CALL GCAP ACCTTO VALUE _ _ _ _)
-          => Ccallgas(SCHED, #accountNonexistent(ACCTTO), GCAP, GAVAIL, VALUE) ~> #allocateCallGas
-          ~> Ccall(SCHED, #accountNonexistent(ACCTTO), GCAP, GAVAIL, VALUE)
-         ...
-         </k>
-         <gas> GAVAIL </gas>
+    rule <k> #gasExec(SCHED, CALL GCAP ACCTTO VALUE _ _ _ _) => #gasExecCall(SCHED, #accountNonexistent(ACCTTO),   GCAP, GAVAIL, VALUE) ... </k> <gas> GAVAIL </gas>
+    rule <k> #gasExec(SCHED, CALLCODE GCAP _ VALUE _ _ _ _)  => #gasExecCall(SCHED, #accountNonexistent(ACCTFROM), GCAP, GAVAIL, VALUE) ... </k> <gas> GAVAIL </gas> <id> ACCTFROM </id>
+    rule <k> #gasExec(SCHED, DELEGATECALL GCAP _ _ _ _ _)    => #gasExecCall(SCHED, #accountNonexistent(ACCTFROM), GCAP, GAVAIL, 0)     ... </k> <gas> GAVAIL </gas> <id> ACCTFROM </id>
+    rule <k> #gasExec(SCHED, STATICCALL GCAP ACCTTO _ _ _ _) => #gasExecCall(SCHED, #accountNonexistent(ACCTTO),   GCAP, GAVAIL, 0)     ... </k> <gas> GAVAIL </gas>
 
-    rule <k> #gasExec(SCHED, CALLCODE GCAP _ VALUE _ _ _ _)
-          => Ccallgas(SCHED, #accountNonexistent(ACCTFROM), GCAP, GAVAIL, VALUE) ~> #allocateCallGas
-          ~> Ccall(SCHED, #accountNonexistent(ACCTFROM), GCAP, GAVAIL, VALUE)
-         ...
-         </k>
-         <id> ACCTFROM </id>
-         <gas> GAVAIL </gas>
-
-    rule <k> #gasExec(SCHED, DELEGATECALL GCAP _ _ _ _ _)
-          => Ccallgas(SCHED, #accountNonexistent(ACCTFROM), GCAP, GAVAIL, 0) ~> #allocateCallGas
-          ~> Ccall(SCHED, #accountNonexistent(ACCTFROM), GCAP, GAVAIL, 0)
-         ...
-         </k>
-         <id> ACCTFROM </id>
-         <gas> GAVAIL </gas>
-
-    rule <k> #gasExec(SCHED, STATICCALL GCAP ACCTTO _ _ _ _)
-          => Ccallgas(SCHED, #accountNonexistent(ACCTTO), GCAP, GAVAIL, 0) ~> #allocateCallGas
-          ~> Ccall(SCHED, #accountNonexistent(ACCTTO), GCAP, GAVAIL, 0)
+    rule <k> #gasExecCall(SCHED, ISEMPTY:Bool, GCAP, GAVAIL, VALUE)
+          => Ccallgas(SCHED, ISEMPTY, GCAP, GAVAIL, VALUE) ~> #allocateCallGas
+          ~> Ccall(SCHED, ISEMPTY, GCAP, GAVAIL, VALUE)
          ...
          </k>
          <gas> GAVAIL </gas>
