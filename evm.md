@@ -2123,10 +2123,20 @@ There are several helpers for calculating gas (most of them also specified in th
                  | Cselfdestruct ( Schedule , BExp , Int )             [strict(2)]
  // ------------------------------------------------------------------------------
     rule <k> Ccall(SCHED, ISEMPTY:Bool, GCAP, GAVAIL, VALUE)
-          => Cextra(SCHED, ISEMPTY, VALUE) +Int Cgascap(SCHED, GCAP, GAVAIL, Cextra(SCHED, ISEMPTY, VALUE)) ... </k>
+          => Cextra0(SCHED, ISEMPTY) +Int Cgascap(SCHED, GCAP, GAVAIL, Cextra0(SCHED, ISEMPTY)) ... </k>
+      requires VALUE ==Int 0
+
+    rule <k> Ccall(SCHED, ISEMPTY:Bool, GCAP, GAVAIL, VALUE)
+          => Cextra1(SCHED, ISEMPTY) +Int Cgascap(SCHED, GCAP, GAVAIL, Cextra1(SCHED, ISEMPTY)) ... </k>
+      requires VALUE >Int 0
 
     rule <k> Ccallgas(SCHED, ISEMPTY:Bool, GCAP, GAVAIL, VALUE)
-          => Cgascap(SCHED, GCAP, GAVAIL, Cextra(SCHED, ISEMPTY, VALUE)) +Int #if VALUE ==Int 0 #then 0 #else Gcallstipend < SCHED > #fi ... </k>
+          => Cgascap(SCHED, GCAP, GAVAIL, Cextra0(SCHED, ISEMPTY))                             ... </k>
+      requires VALUE ==Int 0
+
+    rule <k> Ccallgas(SCHED, ISEMPTY:Bool, GCAP, GAVAIL, VALUE)
+          => Cgascap(SCHED, GCAP, GAVAIL, Cextra1(SCHED, ISEMPTY)) +Int Gcallstipend < SCHED > ... </k>
+      requires VALUE >Int 0
 
     rule <k> Cselfdestruct(SCHED, ISEMPTY:Bool, BAL)
           => Gselfdestruct < SCHED > +Int Cnew(SCHED, ISEMPTY andBool Gselfdestructnewaccount << SCHED >>, BAL) ... </k>
@@ -2136,7 +2146,6 @@ There are several helpers for calculating gas (most of them also specified in th
                  | Rsstore ( Schedule , Int , Int , Int ) [function]
                  | Cextra  ( Schedule , Bool , Int )      [function]
                  | Cnew    ( Schedule , Bool , Int )      [function]
-                 | Cxfer   ( Schedule , Int )             [function]
                  | Cmem    ( Schedule , Int )             [function, functional, memo]
  // ----------------------------------------------------------------------------------
     rule [Cgascap]:
@@ -2175,16 +2184,21 @@ There are several helpers for calculating gas (most of them also specified in th
       => #if CURR =/=Int 0 andBool NEW ==Int 0 #then Rsstoreclear < SCHED > #else 0 #fi
       requires notBool Ghasdirtysstore << SCHED >>
 
-    rule [Cextra]:
-         Cextra(SCHED, ISEMPTY, VALUE)
-      => Gcall < SCHED > +Int Cnew(SCHED, ISEMPTY, VALUE) +Int Cxfer(SCHED, VALUE)
+    rule [Cextra0]:
+         Cextra0(SCHED, ISEMPTY)
+      => Gcall < SCHED > +Int Cnew0(SCHED, ISEMPTY)
 
-    rule [Cnew]:
-         Cnew(SCHED, ISEMPTY:Bool, VALUE)
-      => #if ISEMPTY andBool (VALUE =/=Int 0 orBool Gzerovaluenewaccountgas << SCHED >>) #then Gnewaccount < SCHED > #else 0 #fi
+    rule [Cextra1]:
+         Cextra1(SCHED, ISEMPTY)
+      => Gcall < SCHED > +Int Cnew1(SCHED, ISEMPTY) +Int Gcallvalue < SCHED >
 
-    rule [Cxfer.none]: Cxfer(SCHED, 0) => 0
-    rule [Cxfer.some]: Cxfer(SCHED, N) => Gcallvalue < SCHED > requires N =/=Int 0
+    rule [Cnew0]:
+         Cnew0(SCHED, ISEMPTY:Bool)
+      => #ifGas ISEMPTY andBool Gzerovaluenewaccountgas << SCHED >> #then Gnewaccount < SCHED > #else 0 #fi
+
+    rule [Cnew1]:
+         Cnew1(SCHED, ISEMPTY:Bool)
+      => #ifGas ISEMPTY                                             #then Gnewaccount < SCHED > #else 0 #fi
 
     rule [Cmem]: Cmem(SCHED, N) => (N *Int Gmemory < SCHED >) +Int ((N *Int N) /Int Gquadcoeff < SCHED >)
 
